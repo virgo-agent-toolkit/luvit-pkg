@@ -1,0 +1,15 @@
+[submodule "modules/stream"]
+	path = modules/stream
+	url = https://github.com/virgo-agent-toolkit/luvit-stream
+[submodule "modules/tape"]
+	path = modules/tape
+	url = https://github.com/virgo-agent-toolkit/luvit-tape
+[submodule "modules/template-stream"]
+	path = modules/template-stream
+	url = https://github.com/virgo-agent-toolkit/luvit-template-stream
+[submodule "modules/resolve"]
+	path = modules/resolve
+	url = https://github.com/virgo-agent-toolkit/luvit-resolve
+[submodule "modules/stream-fs"]
+	path = modules/stream-fs
+	url = https://github.com/virgo-agent-toolkit/luvit-stream-fs.git
