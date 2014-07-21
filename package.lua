@@ -29,13 +29,13 @@ return {
   },
   licenses = {"Apache-2.0"},
   dependencies = {
-    "stream",
-    "stream-fs",
-    "template-stream",
-    "resolve",
+    ["stream"] = "https://github.com/virgo-agent-toolkit/luvit-stream",
+    ["stream-fs"] = "https://github.com/virgo-agent-toolkit/luvit-stream-fs",
+    ["template-stream"] = "https://github.com/virgo-agent-toolkit/luvit-template-stream",
+    ["resolve"] = "https://github.com/virgo-agent-toolkit/luvit-resolve",
   },
   devDependencies = {
-    "tape",
+    ["tape"] = "https://github.com/virgo-agent-toolkit/luvit-tape",
   },
   main = 'init.lua',
 }
