@@ -1,5 +1,5 @@
 local fs = require('fs')
-local childprocess = require('childprocess')
+local spawn = require('./spawn')
 local path = require('path')
 local resolve = require('resolve')
 local template = require('template-stream')
@@ -15,15 +15,16 @@ function DependencySatisfier:initialize(enable_dev)
 end
 
 function DependencySatisfier:_write(data, encoding, callback)
-  print(data.module_name .. '    ' .. data.repo_url)
   local module = resolve.resolve_package(data.module_name, process.cwd())
 
-  local childDependencies = function()
+  local childDependencies = function(callback)
     if module and module.package then
       -- recursively satisfy this modules' dependencies
       local dependencies = Dependencies:new(module.package, self.enable_dev)
-      local dependencySatisifer = DependencySatisfier:new(self.enable_dev)
-      DependencySatisfier:once('finish', calllback)
+      local dependencySatisfier = DependencySatisfier:new(self.enable_dev)
+      dependencySatisfier:once('finish', function()
+        callback()
+      end)
       dependencies:pipe(dependencySatisfier)
     else
       -- no need to further deal with dependencies
@@ -33,55 +34,47 @@ function DependencySatisfier:_write(data, encoding, callback)
 
   if module ~= nil then -- module already exists
     -- TODO: check version
-    childDependencies()
+    childDependencies(callback)
   else -- module doesn't not exist yet
-    -- make sure tmp dir is there
-    local tmp_dir = path.join(process.cwd(), '.pkg_tmp')
-    if not fs.existsSync(tmp_dir) then
-      fs.mkdirSync(tmp_dir, '755')
+    -- make sure modules dir is there
+    local modules_dir = path.join(process.cwd(), 'modules')
+    if not fs.existsSync(modules_dir) then
+      fs.mkdirSync(modules_dir, '755')
       -- TODO: mkdirSync crashes the process if there's no permission
     end
 
-    local repo_tmp_dir = path.join(tmp_dir, data.module_name)
     if type(data.repo_url) ~= 'string' then
-      -- not suporrted for now
-      callback() -- callback for Writable to continue to next one
+      print('Pakckage ' .. data.module_name .. ' does not exist but no repo url is provided.')
+      callback()
       return
     end
-    clone_repo(data.repo_url, repo_tmp_dir, function(err)
-      if err then
+    print('Cloning ' .. data.module_name .. ' from ' .. tostring(data.repo_url))
+    local repo_dir = path.join(process.cwd(), 'modules', data.module_name)
+    clone_repo(data.repo_url, repo_dir, function(err)
+      if err and err ~= 0 then
         print('Warning: git clone exits with non-zero exit code: ' .. tostring(err))
       end
 
-      module = resolve.resolve_package(repo_tmp_dir, process.cwd())
+      module = resolve.resolve_package(repo_dir, process.cwd())
       if module == nil then
         -- cloned repo not there; something's wrong
         callback() -- callback for Writable to continue to next one
         return
       end
 
-      -- move/rename repo to the right place
-      local repo_dir
-      if module.package and type(module.package.name) == 'string' then
-        repo_dir = path.join(process.cwd(), 'modules', module.package.name)
-      else
-        repo_dir = path.join(process.cwd(), 'modules', data.module_name)
-      end
-      fs.renameSync(repo_tmp_dir, repo_dir)
-      childDependencies()
+      childDependencies(callback)
     end)
   end
 
 end
 
-function clone_repo(repo_url, repo_tmp_dir, callback)
+function clone_repo(repo_url, repo_dir, callback)
   local tmpl = stream_fs.ReadStream:new(path.join(__dirname, 'tmpl', 'clone.tmpl'))
-  local context = template({repo_url = repo_url, path = repo_path})
-  local concat = stream.Concat:new()
-  concat:string(function(data)
-    childprocess.execFile('bash', {'-c', data}, nil, callback)
-  end)
-  tmpl:pipe(context):pipe(concat)
+  local context = template({repo_url = repo_url, path = repo_dir})
+  local stdio_writer = stream.Writable:new()
+  local proc = spawn('bash', nil, nil)
+  tmpl:pipe(context):pipe(proc.stdin)
+  proc:on('exit', callback)
 end
 
 return DependencySatisfier
