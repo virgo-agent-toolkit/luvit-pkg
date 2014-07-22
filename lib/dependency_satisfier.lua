@@ -44,7 +44,7 @@ function DependencySatisfier:_write(data, encoding, callback)
     end
 
     if type(data.repo_url) ~= 'string' then
-      print('Pakckage ' .. data.module_name .. ' does not exist but no repo url is provided.')
+      print('Package ' .. data.module_name .. ' does not exist but no repo url is provided.')
       callback()
       return
     end
