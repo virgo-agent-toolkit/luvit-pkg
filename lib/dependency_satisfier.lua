@@ -22,13 +22,11 @@ function DependencySatisfier:_write(data, encoding, callback)
       -- recursively satisfy this modules' dependencies
       local dependencies = Dependencies:new(module.package, self.enable_dev)
       local dependencySatisfier = DependencySatisfier:new(self.enable_dev)
-      dependencySatisfier:once('finish', function()
-        callback()
-      end)
+      dependencySatisfier:once('finish', callback)
       dependencies:pipe(dependencySatisfier)
     else
       -- no need to further deal with dependencies
-      callback()
+      process.nextTick(callback)
     end
   end
 
@@ -39,8 +37,12 @@ function DependencySatisfier:_write(data, encoding, callback)
     -- make sure modules dir is there
     local modules_dir = path.join(process.cwd(), 'modules')
     if not fs.existsSync(modules_dir) then
-      fs.mkdirSync(modules_dir, '755')
-      -- TODO: mkdirSync crashes the process if there's no permission
+      local success, err_msg = pcall(fs.mkdirSync, modules_dir, '755')
+      if not success then
+        -- probably lack of permission
+        print(tostring(err_msg))
+        process.exit(1)
+      end
     end
 
     if type(data.repo_url) ~= 'string' then
@@ -50,9 +52,9 @@ function DependencySatisfier:_write(data, encoding, callback)
     end
     print('Cloning ' .. data.module_name .. ' from ' .. tostring(data.repo_url))
     local repo_dir = path.join(process.cwd(), 'modules', data.module_name)
-    clone_repo(data.repo_url, repo_dir, function(err)
-      if err and err ~= 0 then
-        print('Warning: git clone exits with non-zero exit code: ' .. tostring(err))
+    clone_repo(data.repo_url, repo_dir, function(exit_code)
+      if exit_code and exit_code ~= 0 then
+        print('Warning: git clone exits with non-zero exit code: ' .. tostring(exit_code))
       end
 
       module = resolve.resolve_package(repo_dir, process.cwd())
